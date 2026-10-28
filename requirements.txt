@@ -1,0 +1,12 @@
+streamlit
+sqlalchemy
+httpx
+beautifulsoup4
+lxml
+playwright
+pandas
+openpyxl
+email-validator
+dnspython
+pytest
+python-dotenv

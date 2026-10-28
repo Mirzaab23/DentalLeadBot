@@ -1,0 +1,3 @@
+Set-Location $PSScriptRoot
+if (-not (Test-Path '.venv\Scripts\python.exe')) { throw 'Run setup.ps1 first.' }
+& .\.venv\Scripts\python.exe -m streamlit run app.py --server.address localhost --server.port 8501
