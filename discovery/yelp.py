@@ -3,7 +3,7 @@ from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 from playwright.sync_api import sync_playwright
 
 
-def discover(niche, city, state, limit):
+def discover(niche, city, state, limit, search_url=''):
     results = []
     seen = set()
     with sync_playwright() as playwright:

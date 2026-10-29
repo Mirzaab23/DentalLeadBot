@@ -3,13 +3,14 @@ from urllib.parse import quote
 from playwright.sync_api import sync_playwright, TimeoutError as BrowserTimeout
 
 
-def discover(niche, city, state, limit):
+def discover(niche, city, state, limit, search_url=''):
     records = []
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
         page = browser.new_page(locale='en-US')
         try:
-            page.goto('https://www.google.com/maps/search/' + quote(f'{niche} in {city} {state}'), wait_until='domcontentloaded', timeout=30000)
+            base='https://www.google.com/maps/search/'
+            page.goto(base + quote(f'{niche} in {city} {state}'), wait_until='domcontentloaded', timeout=30000)
             page.wait_for_timeout(3500)
             if 'consent' in page.url or 'captcha' in page.url.lower():
                 raise RuntimeError('Google Maps requested consent or a challenge')

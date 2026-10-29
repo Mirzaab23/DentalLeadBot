@@ -95,3 +95,9 @@ class ProcessedBusiness(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     job_id: Mapped[int] = mapped_column(ForeignKey('scraping_jobs.id'), index=True)
     business_id: Mapped[int] = mapped_column(ForeignKey('businesses.id'), index=True)
+
+class JobSeed(Base):
+    __tablename__ = 'job_seeds'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey('scraping_jobs.id'), unique=True)
+    url: Mapped[str] = mapped_column(String)

@@ -26,3 +26,9 @@ The dashboard now has Overview, New search, Jobs, Lead database and Exports view
 ## All-source search
 
 The default search tries Google Maps, OpenStreetMap and Yelp for the same query. Accessible listings are combined, matching businesses are merged when they share a name and city plus a matching phone or address, and the requested lead cap applies to the combined job. A blocked source is reported in the job error field while other sources continue. Search results still depend on the public pages each platform exposes.
+
+## Prospecting searches
+
+Prospecting now has separate Find people, Find companies and Directory search pages. Apollo people search accepts job titles, seniority, person location, industry, employer domain and provider email-status filters. It returns only the fields Apollo exposes in search; email reveal requires a separate credit-consuming enrichment action and is not represented as verified here. Apollo company search requires a one-credit acknowledgement before each results page. An eligible Apollo account and API key are needed for live use.
+
+Directory search accepts a Yelp /search or Google Maps /maps/search HTTPS URL to select that public directory, then searches it using the keyword, city and state entered in the form. Unsupported URLs, including LinkedIn search pages, are rejected with a clear error. Public directory access may be limited by the source.

@@ -1,9 +1,10 @@
 """Persist discovery jobs; interrupted work can be resumed."""
 import os
+from urllib.parse import urlsplit
 from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from database.models import Business, Email, JobBusiness, ProcessedBusiness, ScrapingJob, SocialProfile, VisitedPage, initialize, now
+from database.models import Business, Email, JobBusiness, ProcessedBusiness, JobSeed, ScrapingJob, SocialProfile, VisitedPage, initialize, now
 from discovery.osm import discover
 from discovery.google_maps import discover as discover_google
 from discovery.yelp import discover as discover_yelp
@@ -16,12 +17,25 @@ from services.repair import repair_business
 Path('data').mkdir(exist_ok=True)
 engine = initialize(os.getenv('DATABASE_URL', 'sqlite:///data/leads.db'))
 
-def create_job(niche, city, state, source, limit):
+def create_job(niche, city, state, source, limit, directory_url=''):
+    if directory_url:
+        parsed=urlsplit(directory_url)
+        host=(parsed.hostname or '').lower()
+        if parsed.scheme!='https' or parsed.username or parsed.password:
+            raise ValueError('Use a public HTTPS directory URL.')
+        if host in ('www.yelp.com','yelp.com') and parsed.path.startswith('/search'):
+            source='Yelp'
+        elif host in ('www.google.com','google.com') and parsed.path.startswith('/maps/search'):
+            source='Google Maps'
+        else:
+            raise ValueError('Supported search URLs: Yelp /search and Google Maps /maps/search. LinkedIn requires approved API access.')
     if source not in ('All sources', 'OpenStreetMap', 'Google Maps', 'Yelp'):
         raise ValueError('Unsupported discovery source')
     with Session(engine) as db:
         job = ScrapingJob(niche=niche, city=city, state=state, source=source, target_count=limit)
-        db.add(job); db.commit(); return job.id
+        db.add(job); db.flush()
+        if directory_url: db.add(JobSeed(job_id=job.id,url=directory_url))
+        db.commit(); return job.id
 
 def run_job(job_id):
     with Session(engine) as db:
@@ -30,6 +44,8 @@ def run_job(job_id):
         if job.status == 'completed': return
         job.status = 'running'; job.finished_at = None; job.last_error = ''; db.commit()
         niche, city, state, limit, source = job.niche, job.city, job.state, job.target_count, job.source
+        seed=db.scalar(select(JobSeed).where(JobSeed.job_id==job_id))
+        directory_url=seed.url if seed else ''
     try:
         adapters = {'Google Maps': discover_google, 'OpenStreetMap': discover, 'Yelp': discover_yelp}
         records, errors = [], []
@@ -38,7 +54,10 @@ def run_job(job_id):
                 if db.get(ScrapingJob, job_id).status == 'stop_requested':
                     db.get(ScrapingJob, job_id).status = 'stopped'; db.commit(); return
             try:
-                records.extend(adapters[source_name](niche, city, state, limit))
+                if directory_url and source_name in ('Yelp','Google Maps'):
+                    records.extend(adapters[source_name](niche, city, state, limit, directory_url))
+                else:
+                    records.extend(adapters[source_name](niche, city, state, limit))
             except Exception as exc:
                 errors.append(f'{source_name}: {exc}')
         if errors:

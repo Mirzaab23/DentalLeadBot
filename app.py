@@ -26,8 +26,10 @@ div.stButton button,div.stDownloadButton button {border-radius:9px}
 st.sidebar.markdown('## 🦷 DentalLeadBot')
 st.sidebar.caption('Lead intelligence workspace')
 section = st.sidebar.radio('Workspace', ['Dashboard', 'Prospecting', 'Data management', 'Settings'])
-menus = {'Dashboard':['Overview'], 'Prospecting':['New search','Lead database','Decision-makers'], 'Data management':['Jobs','Exports'], 'Settings':['Providers']}
+menus = {'Dashboard':['Overview'], 'Prospecting':['Find people','Find companies','Directory search','Lead database'], 'Data management':['Jobs','Exports'], 'Settings':['Providers']}
 page = st.sidebar.radio('Pages', menus[section])
+if page == 'Find people': page='Decision-makers'
+if page == 'Directory search': page='New search'
 st.sidebar.divider()
 st.sidebar.caption('Local data · No paid APIs')
 st.markdown('<div class="eyebrow">Lead workspace</div>', unsafe_allow_html=True)
@@ -90,13 +92,16 @@ elif page == 'New search':
     st.caption('Discover businesses, then inspect their official websites for published contacts.')
     with st.form('search'):
         niche = st.text_input('Niche', 'dentists'); city = st.text_input('City'); state = st.text_input('State', max_chars=2).upper(); source = st.selectbox('Source', ['All sources', 'Google Maps', 'OpenStreetMap', 'Yelp']); limit = st.number_input('Maximum leads', 1, 1000, 100)
+        directory_url=st.text_input('Directory search URL · optional',placeholder='https://www.yelp.com/search?...')
         submitted = st.form_submit_button('Start search', type='primary')
     if submitted:
         if not city or len(state) != 2: st.error('Enter a city and two-letter state code.')
         else:
-            job_id = create_job(niche, city, state, source, int(limit))
-            subprocess.Popen([sys.executable, 'main.py', '--resume', str(job_id)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
-            st.success(f'Job {job_id} started. See Jobs for status.')
+            try:
+                job_id = create_job(niche, city, state, source, int(limit), directory_url.strip())
+                subprocess.Popen([sys.executable, 'main.py', '--resume', str(job_id)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+                st.success(f'Job {job_id} started. See Jobs for status.')
+            except ValueError as exc: st.error(str(exc))
 elif page == 'Jobs':
     st.title('Jobs & progress')
     st.button('Refresh')
@@ -152,7 +157,8 @@ elif page == 'Providers':
     with st.container(border=True):
         st.subheader('Apollo · People and roles')
         st.write('Search decision-makers by company domain and job title. Search does not reveal emails; enrichment is a separate credit-consuming action.')
-        st.text_input('Apollo API key',type='password',key='apollo_key',help='Held only in this browser session. Never committed or shown in exports.')
+        def keep_apollo_key(): st.session_state['apollo_credential']=st.session_state['apollo_key_input']
+        st.text_input('Apollo API key',type='password',key='apollo_key_input',value=st.session_state.get('apollo_credential',''),on_change=keep_apollo_key,help='Held only in this browser session. Never committed or shown in exports.')
         st.link_button('Create or manage Apollo account','https://www.apollo.io/')
         st.link_button('Apollo API access and eligibility','https://docs.apollo.io/reference/apollo-api')
     with st.container(border=True):
@@ -166,17 +172,26 @@ elif page == 'Providers':
         st.link_button('Review Clay plans','https://www.clay.com/pricing')
         st.caption('Not connected.')
 elif page == 'Decision-makers':
-    st.title('Find decision-makers')
-    st.caption('Find named professionals at a company. Generic office email addresses are not shown as executive contacts.')
+    st.title('Find people')
+    st.caption('Search by title, seniority, location, industry and employer. Apollo search results do not reveal email addresses.')
     with st.form('people_search'):
-        domain=st.text_input('Company domain',placeholder='company.com')
-        roles=st.multiselect('Target roles',['Owner','Founder','CEO','CFO','CTO','Practice Manager','Office Manager','Managing Partner'],default=['Owner','Founder','CEO','Practice Manager'])
+        left,right=st.columns(2)
+        with left:
+            roles=st.multiselect('Job titles',['Owner','Founder','CEO','CFO','CTO','Practice Manager','Office Manager','Managing Partner'],default=['Owner','Founder','CEO','Practice Manager'])
+            custom_titles=st.text_input('Other titles',placeholder='Medical director, Operations manager')
+            seniority=st.selectbox('Seniority',['Any','Owner','Founder','C Suite','VP','Director','Manager'])
+        with right:
+            domain=st.text_input('Company domain · optional',placeholder='company.com')
+            location=st.text_input('Person location · optional',placeholder='Houston, TX')
+            industry=st.text_input('Company industry · optional',placeholder='hospital & health care')
+            email_status=st.selectbox('Provider email status',['Any','verified','unverified','unavailable'])
         submit=st.form_submit_button('Search people',type='primary')
     if submit:
         from services.people import search_people
         try:
             with st.spinner('Searching Apollo…'):
-                st.session_state['people_results']=search_people(st.session_state.get('apollo_key',''),domain,roles)
+                titles=roles+[value.strip() for value in custom_titles.split(',') if value.strip()]
+                st.session_state['people_results']=search_people(st.session_state.get('apollo_credential',''),domain,titles,location,industry,'' if seniority=='Any' else seniority.lower(),email_status='' if email_status=='Any' else email_status)
         except Exception as exc: st.error(str(exc))
     for person in st.session_state.get('people_results',[]):
         with st.container(border=True):
@@ -185,6 +200,29 @@ elif page == 'Decision-makers':
             st.caption((person.get('organization') or {}).get('name',''))
             st.write('Email: requires separate enrichment')
     if 'people_results' in st.session_state and not st.session_state['people_results']: st.info('No people returned for this domain and role selection.')
+elif page == 'Find companies':
+    st.title('Find companies')
+    st.caption('Search Apollo organizations by niche, location or domain. Apollo charges one credit per results page for this endpoint.')
+    with st.form('company_search'):
+        a,b,c=st.columns(3)
+        keyword=a.text_input('Industry or keyword',placeholder='dental clinic')
+        location=b.text_input('Headquarters location',placeholder='Texas')
+        domain=c.text_input('Domain · optional',placeholder='clinic.com')
+        acknowledge=st.checkbox('Use one Apollo search credit for this page')
+        submit=st.form_submit_button('Search companies',type='primary')
+    if submit:
+        if not acknowledge: st.error('Confirm the one-credit search cost first.')
+        else:
+            from services.people import search_companies
+            try: st.session_state['company_results']=search_companies(st.session_state.get('apollo_credential',''),keyword,location,domain)
+            except Exception as exc: st.error(str(exc))
+    for company in st.session_state.get('company_results',[]):
+        with st.container(border=True):
+            st.subheader(company.get('name') or 'Unnamed company')
+            st.caption(' · '.join(filter(None,[company.get('industry'),company.get('city'),company.get('state')])))
+            st.write(company.get('website_url') or 'Website unavailable')
+            st.write(company.get('phone') or 'Phone unavailable')
+    if 'company_results' in st.session_state and not st.session_state['company_results']: st.info('No companies returned for these filters.')
 elif page == 'Exports':
     st.title('Export leads')
     filtered = lead_filters('exports')
