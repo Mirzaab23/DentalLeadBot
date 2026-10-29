@@ -28,7 +28,7 @@ def discover(niche, city, state, limit):
             for place in fallback.json():
                 if place.get('type') != 'dentist' or not place.get('name'):
                     continue
-                tags = dict(place.get('extratags', {})); address = place.get('address', {})
+                tags = dict(place.get('extratags') or {}); address = place.get('address') or {}
                 tags.update({'name': place['name'], 'addr:housenumber': address.get('house_number', ''), 'addr:street': address.get('road', ''), 'addr:city': address.get('city', city), 'addr:state': state})
                 elements.append({'type': place['osm_type'], 'id': place['osm_id'], 'tags': tags})
         else:

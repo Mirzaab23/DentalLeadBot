@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from database.models import Business, ScrapingJob
+from database.models import Business, Email, ScrapingJob, SocialProfile
 from services.pipeline import create_job, engine
 
 st.set_page_config(page_title='DentalLeadBot', layout='wide')
@@ -15,13 +15,25 @@ page = st.sidebar.radio('Navigation', ['Overview', 'New search', 'Jobs', 'Lead d
 with Session(engine) as db:
     businesses = db.scalars(select(Business).order_by(Business.id.desc())).all()
     jobs = db.scalars(select(ScrapingJob).order_by(ScrapingJob.id.desc())).all()
-    rows = [{k: getattr(b, k) for k in ('id', 'name', 'niche', 'category', 'address', 'city', 'state', 'phone', 'website', 'source', 'source_url', 'status')} for b in businesses]
+    emails = db.scalars(select(Email)).all()
+    socials = db.scalars(select(SocialProfile)).all()
+    email_map = {}
+    social_map = {}
+    for email in emails: email_map.setdefault(email.business_id, set()).add(email.email)
+    for social in socials: social_map.setdefault(social.business_id, {})[social.platform] = social.profile_url
+    rows = []
+    for business in businesses:
+        row = {k: getattr(business, k) for k in ('id', 'name', 'niche', 'category', 'address', 'city', 'state', 'phone', 'website', 'source', 'source_url', 'status')}
+        row['emails'] = ', '.join(sorted(email_map.get(business.id, set())))
+        for platform in ('facebook', 'instagram', 'linkedin', 'tiktok', 'youtube', 'x', 'pinterest'):
+            row[platform] = social_map.get(business.id, {}).get(platform, '')
+        rows.append(row)
     job_rows = [{k: getattr(j, k) for k in ('id', 'niche', 'city', 'state', 'source', 'target_count', 'discovered_count', 'processed_count', 'status', 'last_error')} for j in jobs]
 frame = pd.DataFrame(rows)
 if page == 'Overview':
     cols = st.columns(3)
     cols[0].metric('Businesses', len(rows)); cols[1].metric('With websites', sum(bool(r['website']) for r in rows)); cols[2].metric('Completed jobs', sum(j['status'] == 'completed' for j in job_rows))
-    st.info('The current MVP discovers listings. Website enrichment is not yet connected.')
+    st.metric('With published emails', sum(bool(r['emails']) for r in rows))
 elif page == 'New search':
     with st.form('search'):
         niche = st.text_input('Niche', 'dentists'); city = st.text_input('City'); state = st.text_input('State', max_chars=2).upper(); limit = st.number_input('Maximum leads', 1, 1000, 100)
@@ -52,7 +64,10 @@ elif page == 'Jobs':
             st.rerun()
 elif page == 'Lead database':
     query = st.text_input('Search name, city or state').lower()
-    filtered = [r for r in rows if query in ' '.join(str(r[k]) for k in ('name', 'city', 'state')).lower()]
+    state_filter = st.selectbox('State', ['All'] + sorted({r['state'] for r in rows if r['state']}))
+    has_email = st.checkbox('Has email')
+    has_website = st.checkbox('Has website')
+    filtered = [r for r in rows if query in ' '.join(str(r[k]) for k in ('name', 'city', 'state')).lower() and (state_filter == 'All' or r['state'] == state_filter) and (not has_email or r['emails']) and (not has_website or r['website'])]
     st.dataframe(pd.DataFrame(filtered), use_container_width=True)
 else:
     if frame.empty: st.info('No leads to export yet.')
