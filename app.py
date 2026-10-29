@@ -80,7 +80,7 @@ elif page == 'New search':
     st.title('Create a lead search')
     st.caption('Discover businesses, then inspect their official websites for published contacts.')
     with st.form('search'):
-        niche = st.text_input('Niche', 'dentists'); city = st.text_input('City'); state = st.text_input('State', max_chars=2).upper(); source = st.selectbox('Source', ['Google Maps', 'OpenStreetMap', 'Yelp']); limit = st.number_input('Maximum leads', 1, 1000, 100)
+        niche = st.text_input('Niche', 'dentists'); city = st.text_input('City'); state = st.text_input('State', max_chars=2).upper(); source = st.selectbox('Source', ['All sources', 'Google Maps', 'OpenStreetMap', 'Yelp']); limit = st.number_input('Maximum leads', 1, 1000, 100)
         submitted = st.form_submit_button('Start search', type='primary')
     if submitted:
         if not city or len(state) != 2: st.error('Enter a city and two-letter state code.')

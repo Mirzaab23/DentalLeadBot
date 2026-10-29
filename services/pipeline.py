@@ -16,7 +16,7 @@ Path('data').mkdir(exist_ok=True)
 engine = initialize(os.getenv('DATABASE_URL', 'sqlite:///data/leads.db'))
 
 def create_job(niche, city, state, source, limit):
-    if source not in ('OpenStreetMap', 'Google Maps', 'Yelp'):
+    if source not in ('All sources', 'OpenStreetMap', 'Google Maps', 'Yelp'):
         raise ValueError('Unsupported discovery source')
     with Session(engine) as db:
         job = ScrapingJob(niche=niche, city=city, state=state, source=source, target_count=limit)
@@ -30,16 +30,39 @@ def run_job(job_id):
         job.status = 'running'; job.finished_at = None; job.last_error = ''; db.commit()
         niche, city, state, limit, source = job.niche, job.city, job.state, job.target_count, job.source
     try:
-        adapter = {'Google Maps': discover_google, 'OpenStreetMap': discover, 'Yelp': discover_yelp}[source]
-        records = adapter(niche, city, state, limit)
+        adapters = {'Google Maps': discover_google, 'OpenStreetMap': discover, 'Yelp': discover_yelp}
+        records, errors = [], []
+        for source_name in (adapters if source == 'All sources' else (source,)):
+            with Session(engine) as db:
+                if db.get(ScrapingJob, job_id).status == 'stop_requested':
+                    db.get(ScrapingJob, job_id).status = 'stopped'; db.commit(); return
+            try:
+                records.extend(adapters[source_name](niche, city, state, limit))
+            except Exception as exc:
+                errors.append(f'{source_name}: {exc}')
+        if errors:
+            with Session(engine) as db:
+                db.get(ScrapingJob, job_id).last_error = ' | '.join(errors)
+                db.commit()
+        if not records:
+            raise RuntimeError('No source returned accessible listings. ' + ' | '.join(errors))
         for record in records:
             with Session(engine) as db:
                 job = db.get(ScrapingJob, job_id)
                 if job.status == 'stop_requested':
                     job.status = 'stopped'; db.commit(); return
+                if job.discovered_count >= job.target_count:
+                    break
                 existing = db.scalar(select(Business).where(Business.source == record['source'], Business.source_url == record['source_url']))
                 if existing is None:
+                    candidates = db.scalars(select(Business).where(Business.name == record['name'], Business.city == record['city'], Business.state == record['state'])).all()
+                    existing = next((candidate for candidate in candidates if (record.get('phone') and candidate.phone == record['phone']) or (record.get('address') and candidate.address == record['address'])), None)
+                if existing is None:
                     existing = Business(**record); db.add(existing); db.flush()
+                else:
+                    for field in ('website', 'phone', 'address', 'category'):
+                        if not getattr(existing, field) and record.get(field):
+                            setattr(existing, field, record[field])
                 seen = db.scalar(select(JobBusiness).where(JobBusiness.job_id == job_id, JobBusiness.business_id == existing.id))
                 if seen is None:
                     db.add(JobBusiness(job_id=job_id, business_id=existing.id))

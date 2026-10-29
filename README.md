@@ -22,3 +22,7 @@ Google Maps is now the default source. Its public, unauthenticated results may d
 ## Lead workspace
 
 The dashboard now has Overview, New search, Jobs, Lead database and Exports views. Lead filters cover text, city, state, source, email, website, Instagram, Facebook and LinkedIn. Exports use the active filters and support CSV and Excel. Jobs show counts and progress, plus a notice when a public source provides fewer listings than requested. Completed business checkpoints are stored separately so a resumed job can continue processing unfinished records.
+
+## All-source search
+
+The default search tries Google Maps, OpenStreetMap and Yelp for the same query. Accessible listings are combined, matching businesses are merged when they share a name and city plus a matching phone or address, and the requested lead cap applies to the combined job. A blocked source is reported in the job error field while other sources continue. Search results still depend on the public pages each platform exposes.

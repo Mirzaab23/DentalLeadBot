@@ -3,7 +3,7 @@ from services.pipeline import create_job, run_job
 
 def main():
     parser = argparse.ArgumentParser(description='Discover public dental business listings')
-    parser.add_argument('--niche', default='dentists'); parser.add_argument('--city'); parser.add_argument('--state'); parser.add_argument('--limit', type=int, default=100); parser.add_argument('--source', choices=['Google Maps', 'OpenStreetMap', 'Yelp'], default='Google Maps'); parser.add_argument('--resume', type=int)
+    parser.add_argument('--niche', default='dentists'); parser.add_argument('--city'); parser.add_argument('--state'); parser.add_argument('--limit', type=int, default=100); parser.add_argument('--source', choices=['All sources', 'Google Maps', 'OpenStreetMap', 'Yelp'], default='All sources'); parser.add_argument('--resume', type=int)
     args = parser.parse_args()
     if args.resume:
         job_id = args.resume
