@@ -25,7 +25,9 @@ div.stButton button,div.stDownloadButton button {border-radius:9px}
 </style>''', unsafe_allow_html=True)
 st.sidebar.markdown('## 🦷 DentalLeadBot')
 st.sidebar.caption('Lead intelligence workspace')
-page = st.sidebar.radio('Workspace', ['Overview', 'New search', 'Jobs', 'Lead database', 'Exports'])
+section = st.sidebar.radio('Workspace', ['Dashboard', 'Prospecting', 'Data management', 'Settings'])
+menus = {'Dashboard':['Overview'], 'Prospecting':['New search','Lead database','Decision-makers'], 'Data management':['Jobs','Exports'], 'Settings':['Providers']}
+page = st.sidebar.radio('Pages', menus[section])
 st.sidebar.divider()
 st.sidebar.caption('Local data · No paid APIs')
 st.markdown('<div class="eyebrow">Lead workspace</div>', unsafe_allow_html=True)
@@ -70,9 +72,13 @@ if page == 'Overview':
     a,b = st.columns([2,1])
     with a:
         st.subheader('Recent leads')
-        preview = pd.DataFrame(rows[:10], columns=['name','city','state','phone','website','emails','source','status'])
-        st.dataframe(preview.replace('', 'Not found'), hide_index=True, use_container_width=True)
-        st.caption('Not found means no verified value has been collected. Check the status column for enrichment progress.')
+        for record in rows[:5]:
+            with st.container(border=True):
+                st.markdown('**'+record['name']+'**')
+                st.caption(f"{record['city']}, {record['state']} · {record['source']}")
+                st.write(record['phone'] or 'Phone not collected')
+                st.write(record['emails'] or 'No published email collected')
+                if record['website']: st.link_button('Company website',record['website'],key='overview_site'+str(record['id']))
     with b:
         st.subheader('Recent jobs')
         for job in job_rows[:5]:
@@ -121,17 +127,65 @@ elif page == 'Lead database':
     st.title('Lead database')
     filtered = lead_filters('leads')
     st.caption(f'{len(filtered)} of {len(rows)} businesses')
-    st.dataframe(pd.DataFrame(filtered, columns=['name','city','state','category','phone','website','emails','instagram','facebook','linkedin','source','status']), hide_index=True, use_container_width=True, height=500)
-    if filtered:
-        selected = st.selectbox('Inspect lead', [f"{r['id']} · {r['name']}" for r in filtered])
-        record = next(r for r in filtered if str(r['id']) == selected.split(' · ')[0])
+    page_number = st.number_input('Page', min_value=1, max_value=max(1,(len(filtered)+7)//8), step=1)
+    for record in filtered[(page_number-1)*8:page_number*8]:
         with st.container(border=True):
             st.subheader(record['name'])
-            st.write(record['address'] or 'Address unavailable')
-            st.write('Phone:', record['phone'] or 'Unavailable', ' | Email:', record['emails'] or 'No published email')
-            st.write('Source:', record['source_url'])
-            if record['website']: st.write('Website:',record['website'])
-else:
+            st.caption(f"{record['city']}, {record['state']}  ·  {record['source']}  ·  {record['status'].replace('_',' ')}")
+            left,right=st.columns([3,2])
+            with left:
+                st.markdown('**Company details**')
+                st.write(record['address'] or 'Address not collected')
+                st.write('Phone:',record['phone'] or 'Not collected')
+                if record['website']: st.link_button('Open company website',record['website'])
+            with right:
+                st.markdown('**Published business contacts**')
+                st.write(record['emails'] or 'No published email collected')
+                st.caption('These addresses are not verified decision-maker contacts.')
+                st.link_button('View source listing',record['source_url'])
+            with st.expander('Social profiles'):
+                for platform in ('facebook','instagram','linkedin','tiktok','youtube','x','pinterest'):
+                    if record[platform]: st.link_button(platform.title(),record[platform])
+elif page == 'Providers':
+    st.title('Data providers')
+    st.caption('Connect eligible accounts. API access and free allowances depend on your actual plan.')
+    with st.container(border=True):
+        st.subheader('Apollo · People and roles')
+        st.write('Search decision-makers by company domain and job title. Search does not reveal emails; enrichment is a separate credit-consuming action.')
+        st.text_input('Apollo API key',type='password',key='apollo_key',help='Held only in this browser session. Never committed or shown in exports.')
+        st.link_button('Create or manage Apollo account','https://www.apollo.io/')
+        st.link_button('Apollo API access and eligibility','https://docs.apollo.io/reference/apollo-api')
+    with st.container(border=True):
+        st.subheader('Apify · Website extraction')
+        st.write('The supplied email-scraper actor collects website emails. It does not establish the person or role behind an address. Listed price: from $3.50 per 1,000 results; free platform usage is a dollar credit, not a guaranteed email count.')
+        st.link_button('Review actor and pricing','https://apify.com/ib4ngz/email-scraper')
+        st.caption('Not connected. Automatic paid Actor execution is disabled.')
+    with st.container(border=True):
+        st.subheader('Clay · Enrichment workflows')
+        st.write('Account access, API availability and credits must be verified before enabling automated fallback.')
+        st.link_button('Review Clay plans','https://www.clay.com/pricing')
+        st.caption('Not connected.')
+elif page == 'Decision-makers':
+    st.title('Find decision-makers')
+    st.caption('Find named professionals at a company. Generic office email addresses are not shown as executive contacts.')
+    with st.form('people_search'):
+        domain=st.text_input('Company domain',placeholder='company.com')
+        roles=st.multiselect('Target roles',['Owner','Founder','CEO','CFO','CTO','Practice Manager','Office Manager','Managing Partner'],default=['Owner','Founder','CEO','Practice Manager'])
+        submit=st.form_submit_button('Search people',type='primary')
+    if submit:
+        from services.people import search_people
+        try:
+            with st.spinner('Searching Apollo…'):
+                st.session_state['people_results']=search_people(st.session_state.get('apollo_key',''),domain,roles)
+        except Exception as exc: st.error(str(exc))
+    for person in st.session_state.get('people_results',[]):
+        with st.container(border=True):
+            st.subheader(person.get('name') or ' '.join(filter(None,[person.get('first_name'),person.get('last_name_obfuscated')])) or 'Name restricted by provider')
+            st.write(person.get('title') or 'Role unavailable')
+            st.caption((person.get('organization') or {}).get('name',''))
+            st.write('Email: requires separate enrichment')
+    if 'people_results' in st.session_state and not st.session_state['people_results']: st.info('No people returned for this domain and role selection.')
+elif page == 'Exports':
     st.title('Export leads')
     filtered = lead_filters('exports')
     email_only = st.checkbox('Only businesses with published emails')
