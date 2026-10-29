@@ -14,3 +14,7 @@ Run `.\setup.ps1`, then `.\start.ps1`, and open http://localhost:8501. Or use `.
 
 Listings with an official website are now crawled for up to five same-domain pages when robots.txt allows it. Published email addresses and social profile links are saved with page source URLs. DNS MX checks are recorded as domain evidence, not mailbox delivery claims. The dashboard displays those fields. OpenStreetMap listings frequently omit websites, so contact coverage depends on the source data. The Houston 20-result test discovered 14 listings, with only 3 websites across all 17 stored records and no published email found in that run.
 
+
+## Google Maps and Yelp
+
+Google Maps is now the default source. Its public, unauthenticated results may display a limited view; the scraper records the listings it can actually access and does not claim to reach the requested maximum when fewer are visible. Each accessible place page is inspected for address, phone and official website, then the website crawler extracts published emails and social profiles. A one-listing live Houston job discovered one practice, visited five website pages and saved two published email records. Yelp is selectable but its public search page returned empty content in the current environment, so that source fails with a clear error instead of fabricating results.

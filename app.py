@@ -10,7 +10,7 @@ from services.pipeline import create_job, engine
 
 st.set_page_config(page_title='DentalLeadBot', layout='wide')
 st.title('DentalLeadBot')
-st.caption('Local dental business discovery • OpenStreetMap data')
+st.caption('Local dental business discovery')
 page = st.sidebar.radio('Navigation', ['Overview', 'New search', 'Jobs', 'Lead database', 'Exports'])
 with Session(engine) as db:
     businesses = db.scalars(select(Business).order_by(Business.id.desc())).all()
@@ -36,12 +36,12 @@ if page == 'Overview':
     st.metric('With published emails', sum(bool(r['emails']) for r in rows))
 elif page == 'New search':
     with st.form('search'):
-        niche = st.text_input('Niche', 'dentists'); city = st.text_input('City'); state = st.text_input('State', max_chars=2).upper(); limit = st.number_input('Maximum leads', 1, 1000, 100)
+        niche = st.text_input('Niche', 'dentists'); city = st.text_input('City'); state = st.text_input('State', max_chars=2).upper(); source = st.selectbox('Source', ['Google Maps', 'OpenStreetMap', 'Yelp']); limit = st.number_input('Maximum leads', 1, 1000, 100)
         submitted = st.form_submit_button('Start scraping')
     if submitted:
         if not city or len(state) != 2: st.error('Enter a city and two-letter state code.')
         else:
-            job_id = create_job(niche, city, state, 'OpenStreetMap', int(limit))
+            job_id = create_job(niche, city, state, source, int(limit))
             subprocess.Popen([sys.executable, 'main.py', '--resume', str(job_id)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
             st.success(f'Job {job_id} started. See Jobs for status.')
 elif page == 'Jobs':

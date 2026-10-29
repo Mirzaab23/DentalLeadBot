@@ -5,6 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from database.models import Business, Email, JobBusiness, ScrapingJob, SocialProfile, VisitedPage, initialize, now
 from discovery.osm import discover
+from discovery.google_maps import discover as discover_google
+from discovery.yelp import discover as discover_yelp
 from crawlers.website import crawl
 from extractors.emails import extract_emails
 from extractors.social import extract_social
@@ -14,8 +16,8 @@ Path('data').mkdir(exist_ok=True)
 engine = initialize(os.getenv('DATABASE_URL', 'sqlite:///data/leads.db'))
 
 def create_job(niche, city, state, source, limit):
-    if source != 'OpenStreetMap':
-        raise ValueError('Only OpenStreetMap discovery is available in this MVP')
+    if source not in ('OpenStreetMap', 'Google Maps', 'Yelp'):
+        raise ValueError('Unsupported discovery source')
     with Session(engine) as db:
         job = ScrapingJob(niche=niche, city=city, state=state, source=source, target_count=limit)
         db.add(job); db.commit(); return job.id
@@ -26,9 +28,10 @@ def run_job(job_id):
         if not job: raise ValueError('Job not found')
         if job.status == 'completed': return
         job.status = 'running'; job.finished_at = None; job.last_error = ''; db.commit()
-        niche, city, state, limit = job.niche, job.city, job.state, job.target_count
+        niche, city, state, limit, source = job.niche, job.city, job.state, job.target_count, job.source
     try:
-        records = discover(niche, city, state, limit)
+        adapter = {'Google Maps': discover_google, 'OpenStreetMap': discover, 'Yelp': discover_yelp}[source]
+        records = adapter(niche, city, state, limit)
         for record in records:
             with Session(engine) as db:
                 job = db.get(ScrapingJob, job_id)
