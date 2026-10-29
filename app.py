@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from database.models import Business, Email, ScrapingJob, SocialProfile
+from database.models import Business, Email, Person, ScrapingJob, SocialProfile
 from services.pipeline import create_job, engine
 
 st.set_page_config(page_title='DentalLeadBot | Lead workspace', page_icon='🦷', layout='wide')
@@ -38,6 +38,8 @@ with Session(engine) as db:
     jobs = db.scalars(select(ScrapingJob).order_by(ScrapingJob.id.desc())).all()
     emails = db.scalars(select(Email)).all()
     socials = db.scalars(select(SocialProfile)).all()
+    people = db.scalars(select(Person).order_by(Person.id.desc())).all()
+    people_rows=[{k:getattr(p,k) for k in ('id','business_id','name','title','email','email_status','phone','city','state','linkedin','source','source_url')} for p in people]
     email_map = {}
     social_map = {}
     for email in emails: email_map.setdefault(email.business_id, set()).add(email.email)
@@ -71,6 +73,7 @@ if page == 'Overview':
     st.caption('Track discovery, contact coverage and recent searches.')
     cols = st.columns(4)
     cols[0].metric('Businesses', len(rows)); cols[1].metric('With websites', sum(bool(r['website']) for r in rows)); cols[2].metric('With emails', sum(bool(r['emails']) for r in rows)); cols[3].metric('With social profiles', sum(any(r[p] for p in ('facebook','instagram','linkedin','tiktok','youtube','x','pinterest')) for r in rows))
+    st.caption(f"{len(people_rows)} named people saved locally · {sum(p['email_status']=='verified' for p in people_rows)} provider-verified emails")
     a,b = st.columns([2,1])
     with a:
         st.subheader('Recent leads')
@@ -173,7 +176,23 @@ elif page == 'Providers':
         st.caption('Not connected.')
 elif page == 'Decision-makers':
     st.title('Find people')
-    st.caption('Search by title, seniority, location, industry and employer. Apollo search results do not reveal email addresses.')
+    st.caption('Search named people saved locally, or query an eligible Apollo account for more prospects.')
+    with st.container(border=True):
+        a,b,c=st.columns(3)
+        name_filter=a.text_input('Name or job title',key='local_person_name').casefold()
+        place_filter=b.text_input('City or state',key='local_person_place').casefold()
+        company_filter=c.text_input('Company',key='local_person_company').casefold()
+        company_names={r['id']:r['name'] for r in rows}
+        local_people=[p for p in people_rows if name_filter in (p['name']+' '+p['title']).casefold() and place_filter in (p['city']+' '+p['state']).casefold() and company_filter in company_names.get(p['business_id'],'').casefold()]
+        st.caption(f'{len(local_people)} saved people match')
+        for p in local_people[:25]:
+            with st.container(border=True):
+                st.markdown(f"**{p['name']}** · {p['title'] or 'Role unavailable'}")
+                st.caption(f"{company_names.get(p['business_id'],'Company unavailable')} · {p['city']}, {p['state']}")
+                st.write('Email:',p['email'] or 'Unavailable',' · Status:',p['email_status'])
+                st.write('Phone:',p['phone'] or 'Unavailable')
+                st.link_button('Source',p['source_url'])
+    st.subheader('Search Apollo people')
     with st.form('people_search'):
         left,right=st.columns(2)
         with left:
@@ -192,6 +211,8 @@ elif page == 'Decision-makers':
             with st.spinner('Searching Apollo…'):
                 titles=roles+[value.strip() for value in custom_titles.split(',') if value.strip()]
                 st.session_state['people_results']=search_people(st.session_state.get('apollo_credential',''),domain,titles,location,industry,'' if seniority=='Any' else seniority.lower(),email_status='' if email_status=='Any' else email_status)
+                from services.people_repository import save_apollo_people
+                st.session_state['people_saved']=save_apollo_people(engine,st.session_state['people_results'])
         except Exception as exc: st.error(str(exc))
     for person in st.session_state.get('people_results',[]):
         with st.container(border=True):
@@ -199,10 +220,22 @@ elif page == 'Decision-makers':
             st.write(person.get('title') or 'Role unavailable')
             st.caption((person.get('organization') or {}).get('name',''))
             st.write('Email: requires separate enrichment')
+    if st.session_state.get('people_saved'):
+        st.success(f"{st.session_state['people_saved']} named people saved locally. Refresh to see them in the local list.")
     if 'people_results' in st.session_state and not st.session_state['people_results']: st.info('No people returned for this domain and role selection.')
 elif page == 'Find companies':
     st.title('Find companies')
-    st.caption('Search Apollo organizations by niche, location or domain. Apollo charges one credit per results page for this endpoint.')
+    st.caption('Browse locally discovered companies, then use Apollo when an eligible account is connected.')
+    local_companies=lead_filters('companies')
+    st.caption(f'{len(local_companies)} local companies match')
+    for company in local_companies[:25]:
+        with st.container(border=True):
+            st.markdown(f"**{company['name']}** · {company['city']}, {company['state']}")
+            st.caption(f"{company['category']} · {company['source']} · {company['status']}")
+            st.write(company['website'] or 'Website unavailable',' · ',company['phone'] or 'Phone unavailable')
+            st.link_button('Source listing',company['source_url'])
+    st.subheader('Search Apollo companies')
+    st.caption('Apollo charges one credit per results page for its organization search endpoint.')
     with st.form('company_search'):
         a,b,c=st.columns(3)
         keyword=a.text_input('Industry or keyword',placeholder='dental clinic')

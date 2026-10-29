@@ -2,11 +2,12 @@
 import re
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from database.models import Business, Email, SocialProfile, VisitedPage
+from database.models import Business, Email, Person, SocialProfile, VisitedPage
 from discovery.google_maps import discover
 from crawlers.website import crawl
 from extractors.emails import extract_emails
 from extractors.social import extract_social
+from extractors.people import extract_people
 from services.validator import validate_business_email
 
 def normalized(value):
@@ -39,6 +40,9 @@ def repair_business(engine, business_id):
             for platform,profile in extract_social(html):
                 if not db.scalar(select(SocialProfile).where(SocialProfile.business_id==business_id,SocialProfile.profile_url==profile)):
                     db.add(SocialProfile(business_id=business_id,platform=platform,profile_url=profile,source_url=url))
+            for found in extract_people(html):
+                if not db.scalar(select(Person).where(Person.business_id==business_id,Person.name==found['name'],Person.source_url==url)):
+                    db.add(Person(business_id=business_id,name=found['name'],title=found['title'],email=found['email'],email_status='published_unverified' if found['email'] else 'unavailable',phone=found['phone'],linkedin=found['linkedin'],city=db.get(Business,business_id).city,state=db.get(Business,business_id).state,source='Company website',source_url=url))
         status='enriched' if pages else 'no_accessible_pages'
         db.get(Business,business_id).status=status
         db.commit()

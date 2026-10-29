@@ -4,13 +4,14 @@ from urllib.parse import urlsplit
 from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from database.models import Business, Email, JobBusiness, ProcessedBusiness, JobSeed, ScrapingJob, SocialProfile, VisitedPage, initialize, now
+from database.models import Business, Email, JobBusiness, ProcessedBusiness, JobSeed, Person, ScrapingJob, SocialProfile, VisitedPage, initialize, now
 from discovery.osm import discover
 from discovery.google_maps import discover as discover_google
 from discovery.yelp import discover as discover_yelp
 from crawlers.website import crawl
 from extractors.emails import extract_emails
 from extractors.social import extract_social
+from extractors.people import extract_people
 from services.validator import validate_business_email
 from services.repair import repair_business
 
@@ -118,6 +119,10 @@ def run_job(job_id):
                             for platform, profile in extract_social(html):
                                 if not db.scalar(select(SocialProfile).where(SocialProfile.business_id == business_id, SocialProfile.platform == platform, SocialProfile.profile_url == profile)):
                                     db.add(SocialProfile(business_id=business_id, platform=platform, profile_url=profile, source_url=url))
+                            for found in extract_people(html):
+                                if not db.scalar(select(Person).where(Person.business_id==business_id,Person.name==found['name'],Person.source_url==url)):
+                                    email=found['email']
+                                    db.add(Person(business_id=business_id,name=found['name'],title=found['title'],email=email,email_status='published_unverified' if email else 'unavailable',phone=found['phone'],linkedin=found['linkedin'],city=business.city,state=business.state,source='Company website',source_url=url))
                         business.status = 'enriched' if pages else 'no_pages'
                         db.commit()
                 except Exception as exc:

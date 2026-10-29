@@ -101,3 +101,20 @@ class JobSeed(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     job_id: Mapped[int] = mapped_column(ForeignKey('scraping_jobs.id'), unique=True)
     url: Mapped[str] = mapped_column(String)
+
+class Person(Base):
+    __tablename__ = 'people'
+    __table_args__ = (UniqueConstraint('source', 'source_url', 'name', 'business_id'),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    business_id: Mapped[int | None] = mapped_column(ForeignKey('businesses.id'), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String, index=True)
+    title: Mapped[str] = mapped_column(String, default='')
+    email: Mapped[str] = mapped_column(String, default='')
+    email_status: Mapped[str] = mapped_column(String, default='unavailable')
+    phone: Mapped[str] = mapped_column(String, default='')
+    city: Mapped[str] = mapped_column(String, default='')
+    state: Mapped[str] = mapped_column(String, default='')
+    linkedin: Mapped[str] = mapped_column(String, default='')
+    source: Mapped[str] = mapped_column(String)
+    source_url: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
