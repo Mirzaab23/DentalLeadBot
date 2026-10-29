@@ -95,14 +95,14 @@ elif page == 'New search':
     st.title('Create a lead search')
     st.caption('Discover businesses, then inspect their official websites for published contacts.')
     with st.form('search'):
-        niche = st.text_input('Business keyword', placeholder='Coffee shops, law firms, salons…'); city = st.text_input('City'); state = st.text_input('State', max_chars=2).upper(); source = st.selectbox('Source', ['All sources', 'Google Maps', 'OpenStreetMap', 'Yelp']); limit = st.number_input('Maximum leads', 1, 1000, 100)
+        niche = st.text_input('Business keyword', placeholder='Coffee shops, law firms, salons…'); city = st.text_input('City'); state = st.text_input('State / province / region', placeholder='Punjab or TX'); country=st.text_input('Country',placeholder='Pakistan or United States'); source = st.selectbox('Source', ['All sources', 'Google Maps', 'OpenStreetMap', 'Yelp']); limit = st.number_input('Maximum leads', 1, 1000, 100)
         directory_url=st.text_input('Directory search URL · optional',placeholder='https://www.yelp.com/search?...')
         submitted = st.form_submit_button('Start search', type='primary')
     if submitted:
-        if not city or len(state) != 2: st.error('Enter a city and two-letter state code.')
+        if not city.strip() or not country.strip() or not niche.strip(): st.error('Enter a keyword, city and country.')
         else:
             try:
-                job_id = create_job(niche, city, state, source, int(limit), directory_url.strip())
+                job_id = create_job(niche, city, state, source, int(limit), directory_url.strip(), country.strip())
                 subprocess.Popen([sys.executable, 'main.py', '--resume', str(job_id)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
                 st.success(f'Job {job_id} started. See Jobs for status.')
             except ValueError as exc: st.error(str(exc))
@@ -237,13 +237,16 @@ elif page == 'Find companies':
             st.link_button('Source listing',company['source_url'])
     st.subheader('Search Apollo companies')
     st.caption('Apollo charges one credit per results page for its organization search endpoint.')
+    apollo_connected=bool(st.session_state.get('apollo_credential',''))
+    if not apollo_connected:
+        st.info('Apollo is not connected. Add an eligible API key under Settings → Providers before using paid-credit company search. Local company browsing above remains available.')
     with st.form('company_search'):
         a,b,c=st.columns(3)
         keyword=a.text_input('Industry or keyword',placeholder='coffee shops')
         location=b.text_input('Headquarters location',placeholder='Texas')
         domain=c.text_input('Domain · optional',placeholder='clinic.com')
-        acknowledge=st.checkbox('Use one Apollo search credit for this page')
-        submit=st.form_submit_button('Search companies',type='primary')
+        acknowledge=st.checkbox('Use one Apollo search credit for this page',disabled=not apollo_connected)
+        submit=st.form_submit_button('Search companies',type='primary',disabled=not apollo_connected)
     if submit:
         if not acknowledge: st.error('Confirm the one-credit search cost first.')
         else:

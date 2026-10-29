@@ -43,3 +43,9 @@ Companies discovered from Google Maps, OpenStreetMap and accessible Yelp pages a
 ProspectLab supports arbitrary business keywords. The dashboard has no dental default, and the CLI requires `--niche`. Google Maps and Yelp use the keyword in their public searches. OpenStreetMap maps common niches to standard tags (for example, coffee shops to `amenity=cafe`, lawyers to `office=lawyer`) and falls back to a name query for other keywords. The Companies view can filter by keyword. Older dental data remains in the local database and can be separated with that filter.
 
 A live smoke test with `--niche "coffee shops" --city Houston --state TX --limit 3 --source OpenStreetMap` completed and stored three café listings. The source supplied one website, which returned no usable pages; no email was fabricated. Public-source coverage depends on available listing fields and site access.
+
+## International locations and platform URLs
+
+Directory search accepts a city, optional region and required country. A recognized Yelp or Google Maps home/search URL selects that platform, then the entered keyword and location build the actual search. For example, `https://www.yelp.com/` is accepted as a Yelp source selector. Apollo company search is disabled until a key is connected, so an unconnected user is not asked to approve spending a credit.
+
+A live `coffee shops` search in Lahore, Punjab, Pakistan via Google Maps completed with three real companies, including public phone numbers and websites. OpenStreetMap returned no matching café records for that query; source coverage varies by region.

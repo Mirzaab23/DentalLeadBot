@@ -1,4 +1,4 @@
-"""Discover businesses in a US city using OpenStreetMap public data."""
+"""Discover businesses in a city using OpenStreetMap public data."""
 import time
 import re
 import httpx
@@ -17,11 +17,11 @@ KNOWN_TAGS = {
     'hair salon': ('shop','hairdresser'), 'hair salons': ('shop','hairdresser'),
 }
 
-def discover(niche, city, state, limit):
+def discover(niche, city, state, limit, country='United States'):
     keyword=niche.strip().lower()
     if not keyword: raise ValueError('Business keyword is required')
     with httpx.Client(timeout=45, headers=HEADERS, follow_redirects=False) as client:
-        r = client.get('https://nominatim.openstreetmap.org/search', params={'city': city, 'state': state, 'country': 'United States', 'format': 'jsonv2', 'limit': 1})
+        r = client.get('https://nominatim.openstreetmap.org/search', params={'city': city, 'state': state, 'country': country, 'format': 'jsonv2', 'limit': 1})
         r.raise_for_status()
         places = r.json()
         if not places:
@@ -45,11 +45,11 @@ def discover(niche, city, state, limit):
             # Nominatim provides a smaller, best-effort fallback when Overpass is down or empty.
             time.sleep(1)
             search_term=tag[1].replace('_',' ') if tag else keyword
-            fallback = client.get('https://nominatim.openstreetmap.org/search', params={'q': f'{search_term} {city} {state} United States', 'format': 'jsonv2', 'addressdetails': 1, 'extratags': 1, 'limit': min(max(limit*5,20),40)})
+            fallback = client.get('https://nominatim.openstreetmap.org/search', params={'q': f'{search_term} {city} {state} {country}', 'format': 'jsonv2', 'addressdetails': 1, 'extratags': 1, 'limit': min(max(limit*5,20),40)})
             fallback.raise_for_status()
             elements = []
             for place in fallback.json():
-                if not place.get('name') or (place.get('address') or {}).get('country_code','us').lower() != 'us' or (tag and place.get('type') != tag[1]):
+                if not place.get('name') or (tag and place.get('type') != tag[1]):
                     continue
                 tags = dict(place.get('extratags') or {}); address = place.get('address') or {}
                 tags.update({'name': place['name'], 'addr:housenumber': address.get('house_number', ''), 'addr:street': address.get('road', ''), 'addr:city': address.get('city', city), 'addr:state': state, '_category':place.get('type',keyword)})

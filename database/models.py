@@ -102,6 +102,12 @@ class JobSeed(Base):
     job_id: Mapped[int] = mapped_column(ForeignKey('scraping_jobs.id'), unique=True)
     url: Mapped[str] = mapped_column(String)
 
+class JobLocation(Base):
+    __tablename__ = 'job_locations'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey('scraping_jobs.id'), unique=True)
+    country: Mapped[str] = mapped_column(String)
+
 class Person(Base):
     __tablename__ = 'people'
     __table_args__ = (UniqueConstraint('source', 'source_url', 'name', 'business_id'),)
