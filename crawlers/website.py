@@ -62,6 +62,12 @@ def crawl(website, max_pages=5, timeout=20):
                 continue
             try:
                 response = client.get(url)
+                for _ in range(3):
+                    if response.status_code not in (301,302,303,307,308): break
+                    target = urljoin(url,response.headers.get('location',''))
+                    if urlsplit(target).hostname != root.hostname or not public_url(target) or not parser.can_fetch(AGENT,target): break
+                    url = target
+                    response = client.get(url)
             except httpx.HTTPError:
                 continue
             if response.status_code != 200 or 'text/html' not in response.headers.get('content-type', '').lower():

@@ -11,6 +11,7 @@ from crawlers.website import crawl
 from extractors.emails import extract_emails
 from extractors.social import extract_social
 from services.validator import validate_business_email
+from services.repair import repair_business
 
 Path('data').mkdir(exist_ok=True)
 engine = initialize(os.getenv('DATABASE_URL', 'sqlite:///data/leads.db'))
@@ -71,6 +72,16 @@ def run_job(job_id):
                 business_id, website = existing.id, existing.website
                 if db.scalar(select(ProcessedBusiness).where(ProcessedBusiness.job_id == job_id, ProcessedBusiness.business_id == business_id)):
                     continue
+            if not website:
+                try:
+                    repair_business(engine, business_id)
+                    with Session(engine) as db:
+                        website = db.get(Business,business_id).website
+                except Exception as exc:
+                    with Session(engine) as db:
+                        db.get(Business,business_id).status = 'lookup_failed'
+                        db.get(ScrapingJob,job_id).last_error = str(exc)
+                        db.commit()
             if website:
                 try:
                     pages = crawl(website)

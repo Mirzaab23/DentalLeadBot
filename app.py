@@ -17,6 +17,7 @@ html,body,[data-testid="stApp"] {font-family:'DM Sans',sans-serif;background:#f4
 .block-container {padding-top:2rem;max-width:1450px}
 h1,h2,h3 {color:#172940;letter-spacing:-.025em}
 div[data-testid="stMetric"] {background:white;padding:20px;border:1px solid #e1e9f2;border-radius:14px;box-shadow:0 4px 16px #223b5909}
+div[data-testid="stMetric"] * {color:#192a42!important}
 div[data-testid="stDataFrame"] {border:1px solid #dfe7f0;border-radius:12px;overflow:hidden}
 div.stButton button[kind="primary"],div.stFormSubmitButton button[kind="primary"] {background:#2259d5;color:white;border-radius:9px}
 div.stButton button,div.stDownloadButton button {border-radius:9px}
@@ -69,7 +70,9 @@ if page == 'Overview':
     a,b = st.columns([2,1])
     with a:
         st.subheader('Recent leads')
-        st.dataframe(pd.DataFrame(rows[:10], columns=['name','city','state','phone','website','emails','source']), hide_index=True, use_container_width=True)
+        preview = pd.DataFrame(rows[:10], columns=['name','city','state','phone','website','emails','source','status'])
+        st.dataframe(preview.replace('', 'Not found'), hide_index=True, use_container_width=True)
+        st.caption('Not found means no verified value has been collected. Check the status column for enrichment progress.')
     with b:
         st.subheader('Recent jobs')
         for job in job_rows[:5]:

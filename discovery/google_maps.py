@@ -15,6 +15,9 @@ def discover(niche, city, state, limit):
                 raise RuntimeError('Google Maps requested consent or a challenge')
             links = page.locator('a[href*="/maps/place/"]')
             candidates = []
+            heading = page.locator('h1')
+            if heading.count() and page.locator('[data-item-id="address"]').count():
+                candidates.append((heading.first.inner_text().strip(), page.url))
             for index in range(min(links.count(), limit)):
                 link = links.nth(index)
                 name, url = link.get_attribute('aria-label'), link.get_attribute('href')

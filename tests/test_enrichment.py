@@ -32,6 +32,7 @@ def test_job_persists_published_contacts_and_resumes(tmp_path, monkeypatch):
 
 
 def test_all_sources_continues_after_source_error(tmp_path, monkeypatch):
+    monkeypatch.setattr(pipeline, 'repair_business', lambda *args: 'website_not_found')
     from sqlalchemy import create_engine
     engine = create_engine(f'sqlite:///{tmp_path / "aggregate.db"}')
     Base.metadata.create_all(engine)
