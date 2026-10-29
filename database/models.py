@@ -88,3 +88,10 @@ class JobBusiness(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     job_id: Mapped[int] = mapped_column(ForeignKey('scraping_jobs.id'), index=True)
     business_id: Mapped[int] = mapped_column(ForeignKey('businesses.id'), index=True)
+
+class ProcessedBusiness(Base):
+    __tablename__ = 'processed_businesses'
+    __table_args__ = (UniqueConstraint('job_id', 'business_id'),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey('scraping_jobs.id'), index=True)
+    business_id: Mapped[int] = mapped_column(ForeignKey('businesses.id'), index=True)

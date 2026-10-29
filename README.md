@@ -18,3 +18,7 @@ Listings with an official website are now crawled for up to five same-domain pag
 ## Google Maps and Yelp
 
 Google Maps is now the default source. Its public, unauthenticated results may display a limited view; the scraper records the listings it can actually access and does not claim to reach the requested maximum when fewer are visible. Each accessible place page is inspected for address, phone and official website, then the website crawler extracts published emails and social profiles. A one-listing live Houston job discovered one practice, visited five website pages and saved two published email records. Yelp is selectable but its public search page returned empty content in the current environment, so that source fails with a clear error instead of fabricating results.
+
+## Lead workspace
+
+The dashboard now has Overview, New search, Jobs, Lead database and Exports views. Lead filters cover text, city, state, source, email, website, Instagram, Facebook and LinkedIn. Exports use the active filters and support CSV and Excel. Jobs show counts and progress, plus a notice when a public source provides fewer listings than requested. Completed business checkpoints are stored separately so a resumed job can continue processing unfinished records.

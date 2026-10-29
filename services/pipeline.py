@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from database.models import Business, Email, JobBusiness, ScrapingJob, SocialProfile, VisitedPage, initialize, now
+from database.models import Business, Email, JobBusiness, ProcessedBusiness, ScrapingJob, SocialProfile, VisitedPage, initialize, now
 from discovery.osm import discover
 from discovery.google_maps import discover as discover_google
 from discovery.yelp import discover as discover_yelp
@@ -41,12 +41,13 @@ def run_job(job_id):
                 if existing is None:
                     existing = Business(**record); db.add(existing); db.flush()
                 seen = db.scalar(select(JobBusiness).where(JobBusiness.job_id == job_id, JobBusiness.business_id == existing.id))
-                if seen is not None:
-                    continue
-                db.add(JobBusiness(job_id=job_id, business_id=existing.id))
-                job.discovered_count += 1
+                if seen is None:
+                    db.add(JobBusiness(job_id=job_id, business_id=existing.id))
+                    job.discovered_count += 1
                 db.commit()
                 business_id, website = existing.id, existing.website
+                if db.scalar(select(ProcessedBusiness).where(ProcessedBusiness.job_id == job_id, ProcessedBusiness.business_id == business_id)):
+                    continue
             if website:
                 try:
                     pages = crawl(website)
@@ -71,6 +72,7 @@ def run_job(job_id):
                         db.get(ScrapingJob, job_id).last_error = f'{website}: {exc}'
                         db.commit()
             with Session(engine) as db:
+                db.add(ProcessedBusiness(job_id=job_id, business_id=business_id))
                 db.get(ScrapingJob, job_id).processed_count += 1
                 db.commit()
         with Session(engine) as db:
