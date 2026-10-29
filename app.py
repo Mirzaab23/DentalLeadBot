@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from database.models import Business, Email, Person, ScrapingJob, SocialProfile
 from services.pipeline import create_job, engine
 
-st.set_page_config(page_title='DentalLeadBot | Lead workspace', page_icon='🦷', layout='wide')
+st.set_page_config(page_title='ProspectLab | Lead workspace', page_icon='🔎', layout='wide')
 st.markdown('''<style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
 html,body,[data-testid="stApp"] {font-family:'DM Sans',sans-serif;background:#f4f7fb;color:#192a42}
@@ -23,7 +23,7 @@ div.stButton button[kind="primary"],div.stFormSubmitButton button[kind="primary"
 div.stButton button,div.stDownloadButton button {border-radius:9px}
 .eyebrow {text-transform:uppercase;letter-spacing:.12em;font-size:.72rem;font-weight:700;color:#5b75a0}
 </style>''', unsafe_allow_html=True)
-st.sidebar.markdown('## 🦷 DentalLeadBot')
+st.sidebar.markdown('## 🔎 ProspectLab')
 st.sidebar.caption('Lead intelligence workspace')
 section = st.sidebar.radio('Workspace', ['Dashboard', 'Prospecting', 'Data management', 'Settings'])
 menus = {'Dashboard':['Overview'], 'Prospecting':['Find people','Find companies','Directory search','Lead database'], 'Data management':['Jobs','Exports'], 'Settings':['Providers']}
@@ -56,18 +56,19 @@ frame = pd.DataFrame(rows)
 def lead_filters(prefix):
     with st.container(border=True):
         st.markdown('#### Find leads')
-        a,b,c,d = st.columns([2,1,1,1])
+        a,b,c,d,e = st.columns([2,1,1,1,1])
         query = a.text_input('Search name, address, phone or email', key=prefix+'query').casefold()
         state = b.selectbox('State', ['All'] + sorted({r['state'] for r in rows if r['state']}), key=prefix+'state')
         city = c.selectbox('City', ['All'] + sorted({r['city'] for r in rows if r['city']}), key=prefix+'city')
         source = d.selectbox('Source', ['All'] + sorted({r['source'] for r in rows if r['source']}), key=prefix+'source')
-        e,f,g,h,i = st.columns(5)
-        email = e.checkbox('Has email', key=prefix+'email')
-        website = f.checkbox('Has website', key=prefix+'website')
-        instagram = g.checkbox('Has Instagram', key=prefix+'instagram')
-        facebook = h.checkbox('Has Facebook', key=prefix+'facebook')
-        linkedin = i.checkbox('Has LinkedIn', key=prefix+'linkedin')
-    return [r for r in rows if (not query or query in ' '.join(str(r[k]) for k in ('name','address','phone','emails')).casefold()) and (state=='All' or r['state']==state) and (city=='All' or r['city']==city) and (source=='All' or r['source']==source) and (not email or r['emails']) and (not website or r['website']) and (not instagram or r['instagram']) and (not facebook or r['facebook']) and (not linkedin or r['linkedin'])]
+        niche = e.selectbox('Keyword', ['All'] + sorted({r['niche'] for r in rows if r['niche']}), key=prefix+'niche')
+        f,g,h,i,j = st.columns(5)
+        email = f.checkbox('Has email', key=prefix+'email')
+        website = g.checkbox('Has website', key=prefix+'website')
+        instagram = h.checkbox('Has Instagram', key=prefix+'instagram')
+        facebook = i.checkbox('Has Facebook', key=prefix+'facebook')
+        linkedin = j.checkbox('Has LinkedIn', key=prefix+'linkedin')
+    return [r for r in rows if (not query or query in ' '.join(str(r[k]) for k in ('name','address','phone','emails')).casefold()) and (state=='All' or r['state']==state) and (city=='All' or r['city']==city) and (source=='All' or r['source']==source) and (niche=='All' or r['niche']==niche) and (not email or r['emails']) and (not website or r['website']) and (not instagram or r['instagram']) and (not facebook or r['facebook']) and (not linkedin or r['linkedin'])]
 if page == 'Overview':
     st.title('Lead intelligence')
     st.caption('Track discovery, contact coverage and recent searches.')
@@ -94,7 +95,7 @@ elif page == 'New search':
     st.title('Create a lead search')
     st.caption('Discover businesses, then inspect their official websites for published contacts.')
     with st.form('search'):
-        niche = st.text_input('Niche', 'dentists'); city = st.text_input('City'); state = st.text_input('State', max_chars=2).upper(); source = st.selectbox('Source', ['All sources', 'Google Maps', 'OpenStreetMap', 'Yelp']); limit = st.number_input('Maximum leads', 1, 1000, 100)
+        niche = st.text_input('Business keyword', placeholder='Coffee shops, law firms, salons…'); city = st.text_input('City'); state = st.text_input('State', max_chars=2).upper(); source = st.selectbox('Source', ['All sources', 'Google Maps', 'OpenStreetMap', 'Yelp']); limit = st.number_input('Maximum leads', 1, 1000, 100)
         directory_url=st.text_input('Directory search URL · optional',placeholder='https://www.yelp.com/search?...')
         submitted = st.form_submit_button('Start search', type='primary')
     if submitted:
@@ -238,7 +239,7 @@ elif page == 'Find companies':
     st.caption('Apollo charges one credit per results page for its organization search endpoint.')
     with st.form('company_search'):
         a,b,c=st.columns(3)
-        keyword=a.text_input('Industry or keyword',placeholder='dental clinic')
+        keyword=a.text_input('Industry or keyword',placeholder='coffee shops')
         location=b.text_input('Headquarters location',placeholder='Texas')
         domain=c.text_input('Domain · optional',placeholder='clinic.com')
         acknowledge=st.checkbox('Use one Apollo search credit for this page')
@@ -265,8 +266,8 @@ elif page == 'Exports':
     frame = pd.DataFrame(filtered)
     if frame.empty: st.info('No leads match these filters.')
     else:
-        st.download_button('Download CSV', frame.to_csv(index=False).encode('utf-8-sig'), 'dental_leads.csv', 'text/csv')
+        st.download_button('Download CSV', frame.to_csv(index=False).encode('utf-8-sig'), 'prospect_leads.csv', 'text/csv')
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer: frame.to_excel(writer, index=False, sheet_name='Leads')
-        st.download_button('Download XLSX', output.getvalue(), 'dental_leads.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        st.download_button('Download XLSX', output.getvalue(), 'prospect_leads.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 

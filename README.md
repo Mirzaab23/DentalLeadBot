@@ -1,12 +1,12 @@
-# DentalLeadBot
+# ProspectLab (DentalLeadBot repository)
 
-A local Python application for discovering US dental businesses, enriching public business contact information, and managing leads. It uses SQLite, SQLAlchemy, HTTPX, Playwright and Streamlit. Development and data remain on the local computer; no paid API is required.
+A local Python application for discovering US businesses, enriching public business contact information, and managing leads. It uses SQLite, SQLAlchemy, HTTPX, Playwright and Streamlit. Development and data remain on the local computer; no paid API is required.
 
 ## Current development status
 
 This is an incomplete discovery-only development build. OpenStreetMap search can return dental listings and the local dashboard can display and export them. When Overpass is unavailable, Nominatim fallback returns at most 40 results and may return fewer. OpenStreetMap data is contributed by volunteers and may be incomplete; see https://www.openstreetmap.org/copyright.
 
-Yelp, full filtering, robust interrupted-worker recovery, and the full acceptance tests are not yet implemented. Website enrichment is implemented for records with a usable official website URL. Search currently always requests dentist listings even if a different niche is entered. Stop requests take effect between records, not while a remote request is in flight.
+Yelp, full filtering, robust interrupted-worker recovery, and the full acceptance tests are not yet implemented. Website enrichment is implemented for records with a usable official website URL. Search uses the entered keyword across sources; OpenStreetMap maps common niches to categories and uses a text search for other keywords. Stop requests take effect between records, not while a remote request is in flight.
 
 Run `.\setup.ps1`, then `.\start.ps1`, and open http://localhost:8501. Or use `.\.venv\Scripts\python.exe main.py --city Houston --state TX --limit 3`. The dashboard starts workers in the background.
 
@@ -36,3 +36,10 @@ Directory search accepts a Yelp /search or Google Maps /maps/search HTTPS URL to
 ## Local people and companies
 
 Companies discovered from Google Maps, OpenStreetMap and accessible Yelp pages are stored locally. Website crawling adds named people only from explicit structured Person data, preserving the source page. A company email or office phone is never assigned to a person without a source that makes that association. The People page searches the local person table by name, title, location and linked company. Apollo search results can add explicitly named people to the local table when an eligible account is connected; hidden identities and unreturned email addresses are not invented. Email status distinguishes published but unverified from unavailable and provider-verified fields. On the existing local data, a website revisit found seven named people from four stored websites.
+
+
+## General business search
+
+ProspectLab supports arbitrary business keywords. The dashboard has no dental default, and the CLI requires `--niche`. Google Maps and Yelp use the keyword in their public searches. OpenStreetMap maps common niches to standard tags (for example, coffee shops to `amenity=cafe`, lawyers to `office=lawyer`) and falls back to a name query for other keywords. The Companies view can filter by keyword. Older dental data remains in the local database and can be separated with that filter.
+
+A live smoke test with `--niche "coffee shops" --city Houston --state TX --limit 3 --source OpenStreetMap` completed and stored three café listings. The source supplied one website, which returned no usable pages; no email was fabricated. Public-source coverage depends on available listing fields and site access.
