@@ -4,7 +4,8 @@ from urllib.parse import urlsplit
 from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from database.models import Business, Email, JobBusiness, ProcessedBusiness, JobSeed, JobLocation, JobTarget, Person, ScrapingJob, SocialProfile, VisitedPage, initialize, now
+from database import models as db_models
+from database.models import Business, Email, JobBusiness, ProcessedBusiness, JobSeed, JobLocation, Person, ScrapingJob, SocialProfile, VisitedPage, initialize, now
 from discovery.osm import discover
 from discovery.google_maps import discover as discover_google
 from discovery.yelp import discover as discover_yelp
@@ -37,7 +38,9 @@ def create_job(niche, city, state, source, limit, directory_url='', country='Uni
         db.add(job); db.flush()
         if directory_url: db.add(JobSeed(job_id=job.id,url=directory_url))
         db.add(JobLocation(job_id=job.id,country=country.strip() or 'United States'))
-        db.add(JobTarget(job_id=job.id,roles=roles.strip()))
+        job_target_model = getattr(db_models, 'JobTarget', None)
+        if job_target_model:
+            db.add(job_target_model(job_id=job.id,roles=roles.strip()))
         db.commit(); return job.id
 
 def run_job(job_id):

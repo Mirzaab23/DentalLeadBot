@@ -5,7 +5,8 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from database.models import Business, Email, JobBusiness, JobTarget, Person, ScrapingJob, SocialProfile
+from database import models as db_models
+from database.models import Business, Email, JobBusiness, Person, ScrapingJob, SocialProfile
 from services.pipeline import create_job, engine
 
 st.set_page_config(page_title='ProspectLab | Lead workspace', page_icon='🔎', layout='wide')
@@ -129,7 +130,8 @@ elif page == 'Jobs' and st.query_params.get('job'):
         st.caption(f"{selected_job['niche']} · {selected_job['city']}, {selected_job['state']} · {selected_job['status']}")
         with Session(engine) as db:
             business_ids = db.scalars(select(JobBusiness.business_id).where(JobBusiness.job_id == job_id)).all()
-            target = db.scalar(select(JobTarget).where(JobTarget.job_id == job_id))
+            job_target_model = getattr(db_models, 'JobTarget', None)
+            target = db.scalar(select(job_target_model).where(job_target_model.job_id == job_id)) if job_target_model else None
             target_roles = [role.strip().casefold() for role in target.roles.split(',') if role.strip()] if target else []
         job_leads = [row for row in rows if row['id'] in business_ids]
         job_people = [person for person in people_rows if person['business_id'] in business_ids]
