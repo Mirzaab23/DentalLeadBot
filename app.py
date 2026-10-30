@@ -25,11 +25,11 @@ div.stButton button,div.stDownloadButton button {border-radius:9px}
 </style>''', unsafe_allow_html=True)
 st.sidebar.markdown('## 🔎 ProspectLab')
 st.sidebar.caption('Lead intelligence workspace')
-section = st.sidebar.radio('Workspace', ['Dashboard', 'Prospecting', 'Data management', 'Settings'])
-menus = {'Dashboard':['Overview'], 'Prospecting':['Find people','Find companies','Directory search','Lead database'], 'Data management':['Jobs','Exports'], 'Settings':['Providers']}
+section = st.sidebar.radio('Workspace', ['Prospecting', 'Dashboard', 'Data management', 'Settings'])
+menus = {'Dashboard':['Overview'], 'Prospecting':['Search prospects','Find people','Find companies','Lead database'], 'Data management':['Jobs','Exports'], 'Settings':['Providers']}
 page = st.sidebar.radio('Pages', menus[section])
 if page == 'Find people': page='Decision-makers'
-if page == 'Directory search': page='New search'
+if page == 'Search prospects': page='New search'
 st.sidebar.divider()
 st.sidebar.caption('Local data · No paid APIs')
 st.markdown('<div class="eyebrow">Lead workspace</div>', unsafe_allow_html=True)
@@ -92,13 +92,19 @@ if page == 'Overview':
                 st.write(f"**#{job['id']} · {job['city']}, {job['state']}**")
                 st.caption(f"{job['source']} · {job['status']} · {job['processed_count']} processed")
 elif page == 'New search':
-    st.title('Create a lead search')
-    st.caption('Discover businesses, then inspect their official websites for published contacts.')
+    st.title('Search prospects')
+    st.caption('Enter your target market and start a new US prospect discovery job.')
     with st.form('search'):
-        niche = st.text_input('Niche', placeholder='Coffee shops, law firms, salons…'); city = st.text_input('City', placeholder='Austin'); state = st.text_input('State', placeholder='TX'); keywords = st.text_input('Keywords · optional', placeholder='Independent, specialty coffee'); source = st.selectbox('Source', ['All sources', 'Google Maps', 'OpenStreetMap', 'Yelp']); limit = st.number_input('Maximum leads', 1, 1000, 100)
-        st.caption('Searching the United States. All sources runs Google Maps, OpenStreetMap, and Yelp.')
-        directory_url=st.text_input('Directory search URL · optional',placeholder='https://www.yelp.com/search?...')
-        submitted = st.form_submit_button('Start search', type='primary')
+        niche = st.text_input('Niche', placeholder='Coffee shops, law firms, salons…')
+        city, state = st.columns(2)
+        city = city.text_input('City', placeholder='Austin')
+        state = state.text_input('State', placeholder='TX')
+        keywords = st.text_input('Keywords · optional', placeholder='Independent, specialty coffee')
+        with st.expander('Search options'):
+            source = st.selectbox('Sources', ['All sources', 'Google Maps', 'OpenStreetMap', 'Yelp'])
+            limit = st.number_input('Maximum leads', 1, 1000, 100)
+            directory_url=st.text_input('Directory search URL · optional',placeholder='https://www.yelp.com/search?...')
+        submitted = st.form_submit_button('Start prospect search', type='primary', use_container_width=True)
     if submitted:
         if not city.strip() or not niche.strip(): st.error('Enter a niche and a US city.')
         else:
@@ -106,8 +112,9 @@ elif page == 'New search':
                 search_terms = ' '.join(part.strip() for part in (niche, keywords) if part.strip())
                 job_id = create_job(search_terms, city, state, source, int(limit), directory_url.strip(), 'United States')
                 subprocess.Popen([sys.executable, 'main.py', '--resume', str(job_id)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
-                st.success(f'Job {job_id} started. See Jobs for status.')
+                st.success(f'Prospect search job #{job_id} started. Open Data management → Jobs to track progress.')
             except ValueError as exc: st.error(str(exc))
+    st.caption('All sources searches Google Maps, OpenStreetMap, and Yelp. Availability and contact coverage vary by source.')
 elif page == 'Jobs':
     st.title('Jobs & progress')
     st.button('Refresh')
