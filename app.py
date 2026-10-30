@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from database.models import Business, Email, Person, ScrapingJob, SocialProfile
+from database.models import Business, Email, JobBusiness, JobTarget, Person, ScrapingJob, SocialProfile
 from services.pipeline import create_job, engine
 
 st.set_page_config(page_title='ProspectLab | Lead workspace', page_icon='🔎', layout='wide')
@@ -100,6 +100,7 @@ elif page == 'New search':
         city = city.text_input('City', placeholder='Austin')
         state = state.text_input('State', placeholder='TX')
         keywords = st.text_input('Keywords · optional', placeholder='Independent, specialty coffee')
+        roles = st.text_input('Decision-maker roles · optional', placeholder='Owner, Founder, CEO, Managing Partner')
         with st.expander('Search options'):
             source = st.selectbox('Sources', ['All sources', 'Google Maps', 'OpenStreetMap', 'Yelp'])
             limit = st.number_input('Maximum leads', 1, 1000, 100)
@@ -110,16 +111,60 @@ elif page == 'New search':
         else:
             try:
                 search_terms = ' '.join(part.strip() for part in (niche, keywords) if part.strip())
-                job_id = create_job(search_terms, city, state, source, int(limit), directory_url.strip(), 'United States')
+                job_id = create_job(search_terms, city, state, source, int(limit), directory_url.strip(), 'United States', roles)
                 subprocess.Popen([sys.executable, 'main.py', '--resume', str(job_id)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
                 st.success(f'Prospect search job #{job_id} started. Open Data management → Jobs to track progress.')
             except ValueError as exc: st.error(str(exc))
     st.caption('All sources searches Google Maps, OpenStreetMap, and Yelp. Availability and contact coverage vary by source.')
+elif page == 'Jobs' and st.query_params.get('job'):
+    job_id = int(st.query_params['job']) if str(st.query_params['job']).isdigit() else -1
+    selected_job = next((job for job in job_rows if job['id'] == job_id), None)
+    if st.button('← Back to jobs'):
+        del st.query_params['job']
+        st.rerun()
+    if selected_job is None:
+        st.error('Job not found.')
+    else:
+        st.title(f"Job #{job_id} results")
+        st.caption(f"{selected_job['niche']} · {selected_job['city']}, {selected_job['state']} · {selected_job['status']}")
+        with Session(engine) as db:
+            business_ids = db.scalars(select(JobBusiness.business_id).where(JobBusiness.job_id == job_id)).all()
+            target = db.scalar(select(JobTarget).where(JobTarget.job_id == job_id))
+            target_roles = [role.strip().casefold() for role in target.roles.split(',') if role.strip()] if target else []
+        job_leads = [row for row in rows if row['id'] in business_ids]
+        job_people = [person for person in people_rows if person['business_id'] in business_ids]
+        a, b, c = st.columns(3)
+        a.metric('Companies', len(job_leads))
+        b.metric('Named people', len(job_people))
+        c.metric('People with published email', sum(bool(person['email']) for person in job_people))
+        if target_roles: st.caption('Target roles: ' + ', '.join(target_roles))
+        if selected_job['last_error']: st.warning(selected_job['last_error'])
+        if not job_leads: st.info('This job has no saved company results yet. Refresh while it runs.')
+        for lead in job_leads:
+            with st.container(border=True):
+                st.subheader(lead['name'])
+                st.caption(f"{lead['address'] or lead['city'] + ', ' + lead['state']} · {lead['source']}")
+                st.write('Company phone:', lead['phone'] or 'Not found')
+                st.write('Company website:', lead['website'] or 'Not found')
+                if lead['emails']: st.write('Published company emails:', lead['emails'])
+                contacts = [person for person in job_people if person['business_id'] == lead['id']]
+                contacts.sort(key=lambda person: not any(role in person['title'].casefold() for role in target_roles))
+                st.markdown('**Decision makers and staff**')
+                if not contacts: st.caption('No named contact with a documented role found on the company website.')
+                for person in contacts:
+                    match = bool(target_roles and any(role in person['title'].casefold() for role in target_roles))
+                    st.write(f"{person['name']} · {person['title'] or 'Role not published'}{' · Target role match' if match else ''}")
+                    st.caption(f"Email: {person['email'] or 'Not found'} ({person['email_status']}) · Direct phone: {person['phone'] or 'Not found'}")
+                    st.link_button(f"Evidence for {person['name']}", person['source_url'])
+                st.link_button('Source listing', lead['source_url'])
 elif page == 'Jobs':
     st.title('Jobs & progress')
     st.button('Refresh')
     for job in job_rows:
         with st.expander(f"#{job['id']} · {job['niche']} in {job['city']}, {job['state']} · {job['status']}"):
+            if st.button('Open job results →', key=f"open_job_{job['id']}"):
+                st.query_params['job'] = str(job['id'])
+                st.rerun()
             a,b,c=st.columns(3)
             a.metric('Discovered',job['discovered_count']); b.metric('Processed',job['processed_count']); c.metric('Emails found',job['email_found_count'])
             st.progress(min(1.0,job['processed_count']/max(1,job['target_count'])))

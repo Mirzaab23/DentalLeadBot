@@ -14,6 +14,10 @@ def test_named_person_with_provenance_fields():
 def test_generic_office_mailbox_does_not_create_person():
     assert extract_people('<a href="mailto:office@clinic.test">Office</a>')==[]
 
+def test_team_card_collects_only_published_person_contacts():
+    html='<div class="team-member"><h3>Ada Rivera</h3><span class="role">Managing Partner</span><a href="mailto:ada@example.test">Email</a><a href="tel:+15125550100">Call</a></div>'
+    assert extract_people(html)==[{'name':'Ada Rivera','title':'Managing Partner','email':'ada@example.test','phone':'+15125550100','linkedin':''}]
+
 def test_apollo_preview_saves_only_named_people(tmp_path):
     engine=create_engine(f'sqlite:///{tmp_path / "people.db"}')
     Base.metadata.create_all(engine)
